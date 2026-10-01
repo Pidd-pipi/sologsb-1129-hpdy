@@ -45,6 +45,7 @@ docker compose down        # 停止并移除容器（数据在浏览器本地，
 - **v1**：建 `matrices` 表（含 code / character / font / sizeName / material / availability 索引）
 - **v2**：加 `cases` 表与 `matrixId` 多值索引；升级时按 `slots` 回填历史字盘的 `matrixId`
 - **v3**：加 `defects`、`proofs` 表；升级时为「停用 / 待补刻」的历史字模回填缺损原因记录
+- **v4**：加 `receipts`、`reconciliations` 表，支撑盘点对账：回执与对账结果持久化，导入失败不丢回执，恢复后可接着核对，同一回执再次提交不重复生成结果
 
 首次打开且库为空时会写入一批示例档案（16 枚字模、2 个字盘、5 条缺损、6 条试印），便于直接体验；已有数据则跳过。
 
@@ -58,6 +59,7 @@ docker compose down        # 停止并移除容器（数据在浏览器本地，
 | `/cases` | `CaseEditor` | 字盘布局编辑器：行列网格点击落位 / 取出 / 调换，实时提示空格与重复落位 |
 | `/defects` | `DefectBoard` | 缺损登记：提交后自动停用字模并进入待补刻清单，补刻完成一键恢复 |
 | `/proofs` | `ProofList` | 试印记录：登记压力、用墨与清晰度，按样张编号回溯试印批次 |
+| `/reconcile` | `Reconcile` | 盘点对账：导入车间回执，先按编号配对，改号后按字符 / 字体 / 格位确认；占两位、找不到或已停用的字模列待裁定，确认后事务性更新字模、落位与缺损记录，试印记录原样保留 |
 
 ## 目录结构
 
@@ -74,15 +76,15 @@ docker compose down        # 停止并移除容器（数据在浏览器本地，
     ├── tailwind.config.js / postcss.config.js / vite.config.ts
     ├── public/favicon.svg
     └── src/
-        ├── types/{matrix,case,defect,proof}.ts
-        ├── db/index.ts       # Dexie 库、版本迁移、示例档案
-        ├── stores/{matrixStore,caseStore,uiStore}.ts
+        ├── types/{matrix,case,defect,proof,receipt}.ts
+        ├── db/index.ts       # Dexie 库、版本迁移（v4 加 receipts / reconciliations）、示例档案
+        ├── stores/{matrixStore,caseStore,receiptStore,uiStore}.ts
         ├── hooks/{useMatrixSearch,useLocalDraft,useCaseSlots}.ts
         ├── components/common/{MatrixCell,LayoutGrid,CharacterPicker,DefectBadge,EmptyState}.tsx
         ├── layouts/AppShell.tsx
-        ├── pages/{Overview,MatrixNew,MatrixDetail,CaseEditor,DefectBoard,ProofList}.tsx
+        ├── pages/{Overview,MatrixNew,MatrixDetail,CaseEditor,DefectBoard,ProofList,Reconcile}.tsx
         ├── router/index.tsx
-        └── utils/{charIndex,layout,format}.ts
+        └── utils/{charIndex,layout,format,reconcile}.ts
 ```
 
 ## 数据存储说明

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useCaseStore } from '../stores/caseStore';
 import { useMatrixStore } from '../stores/matrixStore';
+import { useReceiptStore } from '../stores/receiptStore';
 import { useUiStore } from '../stores/uiStore';
 
 const NAV = [
@@ -10,6 +11,7 @@ const NAV = [
   { to: '/cases', label: '字盘布局', testId: 'nav-cases', end: false },
   { to: '/defects', label: '缺损登记', testId: 'nav-defects', end: false },
   { to: '/proofs', label: '试印记录', testId: 'nav-proofs', end: false },
+  { to: '/reconcile', label: '盘点对账', testId: 'nav-reconcile', end: false },
 ];
 
 const TOAST_STYLE: Record<string, string> = {
@@ -22,6 +24,7 @@ export default function AppShell() {
   const location = useLocation();
   const loadMatrices = useMatrixStore((s) => s.load);
   const loadCases = useCaseStore((s) => s.load);
+  const loadReceipts = useReceiptStore((s) => s.load);
   const matrixCount = useMatrixStore((s) => s.matrices.length);
   const disabledCount = useMatrixStore(
     (s) => s.matrices.filter((m) => m.availability === '停用').length,
@@ -36,7 +39,8 @@ export default function AppShell() {
   useEffect(() => {
     void loadMatrices();
     void loadCases();
-  }, [loadMatrices, loadCases]);
+    void loadReceipts();
+  }, [loadMatrices, loadCases, loadReceipts]);
 
   useEffect(() => {
     if (!toast) return;

@@ -5,6 +5,7 @@ import type { DefectSeverity, DefectType } from '../types/defect';
 import type { MatrixAvailability, MatrixFont, MatrixMaterial, TypeMatrix } from '../types/matrix';
 import { ptOfSize } from '../types/matrix';
 import type { ProofRecord } from '../types/proof';
+import type { Receipt, ReconciliationRecord } from '../types/receipt';
 import { matrixIdsOf } from '../utils/layout';
 import { suggestCaseCode, suggestMatrixCode, toPlain } from '../utils/format';
 
@@ -15,12 +16,15 @@ export const DB_NAME = 'gbmovabletype-db';
  * v1 建 matrices
  * v2 加 cases 表与 matrixId 索引
  * v3 加 defects / proofs 表，并为停用字模回填缺损原因
+ * v4 加 receipts / reconciliations 表，支撑盘点对账与失败恢复
  */
 class MovableTypeDb extends Dexie {
   matrices!: Table<TypeMatrix, string>;
   cases!: Table<TypeCase, string>;
   defects!: Table<DefectLog, string>;
   proofs!: Table<ProofRecord, string>;
+  receipts!: Table<Receipt, string>;
+  reconciliations!: Table<ReconciliationRecord, string>;
 
   constructor() {
     super(DB_NAME);
@@ -78,6 +82,14 @@ class MovableTypeDb extends Dexie {
           });
         }
       });
+    this.version(4).stores({
+      matrices: 'id, code, character, font, sizeName, material, availability',
+      cases: 'id, code, kind, workStation, *matrixId',
+      defects: 'id, matrixId, defectType, severity, availability, foundDate',
+      proofs: 'id, matrixId, sampleNo, clarity, proofDate',
+      receipts: 'id, code, status, receiptDate',
+      reconciliations: 'id, receiptId, lineId, matchedMatrixId, category, verdict',
+    });
   }
 }
 
