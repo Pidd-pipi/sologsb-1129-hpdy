@@ -1,6 +1,6 @@
 # 活字字模与铅字档案（gbmovabletype）
 
-面向活字印刷体验馆、铅字工坊与字体研究者的字模 / 字盘 / 试印档案工具：登记字模的字体、字号与材质，在行列网格上编辑字盘落位，记录缺笔磨损等损耗并据此停用或补刻。**纯前端单页应用**，数据全部保存在浏览器本地，不依赖任何后端服务、数据库或外部接口。
+面向活字印刷体验馆、铅字工坊与字体研究者的字模 / 字盘 / 试印档案工具：登记字模的字体、字号与材质，在行列网格上编辑字盘落位，记录缺笔磨损等损耗并据此停用或补刻；并可导入**车间回执**做盘点对账——先按编号配对、改号按字符 / 字体 / 盘内格位确认，异常列待裁定，馆员确认后一次性更新字模、落位与缺损记录。**纯前端单页应用**，数据全部保存在浏览器本地，不依赖任何后端服务、数据库或外部接口。
 
 ## Docker 一键启动（推荐）
 
@@ -45,6 +45,7 @@ docker compose down        # 停止并移除容器（数据在浏览器本地，
 - **v1**：建 `matrices` 表（含 code / character / font / sizeName / material / availability 索引）
 - **v2**：加 `cases` 表与 `matrixId` 多值索引；升级时按 `slots` 回填历史字盘的 `matrixId`
 - **v3**：加 `defects`、`proofs` 表；升级时为「停用 / 待补刻」的历史字模回填缺损原因记录
+- **v4**：加 `reconBatches` 表（车间回执盘点对账批次：回执原文、核对条目、断点进度）
 
 首次打开且库为空时会写入一批示例档案（16 枚字模、2 个字盘、5 条缺损、6 条试印），便于直接体验；已有数据则跳过。
 
@@ -58,6 +59,19 @@ docker compose down        # 停止并移除容器（数据在浏览器本地，
 | `/cases` | `CaseEditor` | 字盘布局编辑器：行列网格点击落位 / 取出 / 调换，实时提示空格与重复落位 |
 | `/defects` | `DefectBoard` | 缺损登记：提交后自动停用字模并进入待补刻清单，补刻完成一键恢复 |
 | `/proofs` | `ProofList` | 试印记录：登记压力、用墨与清晰度，按样张编号回溯试印批次 |
+| `/stocktake` | `Stocktake` | 车间回执盘点对账：导入回执 → 自动核对 → 馆员裁定 → 统一落账 |
+
+## 车间回执盘点对账（`/stocktake`）
+
+车间交回的盘点回执（制表符或逗号分隔，每行 `字模编号 / 字符 / 字体 / 字盘编号 / 盘内格位`，格位支持 `A1`、`1-1`、`1行1列`）按以下规则核对，**裁定确认前绝不改动档案**：
+
+1. **先按编号配对**：编号在档案中存在，再核对字符、字体与盘内格位。
+2. **改号后按字符、字体、格位确认**：编号在档案中找不到，但回执字盘内（申报格位或盘内唯一匹配）有同字符同字体字模的，列为「疑似改号」建议，采纳后改号并按需移位。
+3. 编号一致、字符字体相符但仅格位不符的，给出「按回执格位移位」的建议。
+4. **先列待裁定**的异常：同一枚字模占两个格位（保留申报格取净其余 / 全部取出）、盘里有档案找不到的字模（补登记新字模 / 忽略）、停用或待补刻字模出现在盘内（复查复置 / 维持停用并取出）、字符或字体与档案不符（按回执纠正 / 以档案为准）。
+5. 馆员逐条处理（采纳或忽略）完毕后，点「统一落账」：字模、字盘格位、缺损记录在**同一个 Dexie 事务**内更新，失败整体回滚；**既有试印记录照原样保留**。
+6. 导入 / 核对失败时**回执原文与已核对进度都保留**，恢复后从断点继续；同一份回执（按内容哈希识别）再次提交直接复用既有批次，**不重复生成结果**。
+
 
 ## 目录结构
 
@@ -74,20 +88,21 @@ docker compose down        # 停止并移除容器（数据在浏览器本地，
     ├── tailwind.config.js / postcss.config.js / vite.config.ts
     ├── public/favicon.svg
     └── src/
-        ├── types/{matrix,case,defect,proof}.ts
+        ├── types/{matrix,case,defect,proof,reconcile}.ts
         ├── db/index.ts       # Dexie 库、版本迁移、示例档案
-        ├── stores/{matrixStore,caseStore,uiStore}.ts
+        ├── stores/{matrixStore,caseStore,uiStore,reconStore}.ts
         ├── hooks/{useMatrixSearch,useLocalDraft,useCaseSlots}.ts
         ├── components/common/{MatrixCell,LayoutGrid,CharacterPicker,DefectBadge,EmptyState}.tsx
+        ├── components/stocktake/{ReceiptImportPanel,ReconBatchDetail,ReconItemRow}.tsx
         ├── layouts/AppShell.tsx
-        ├── pages/{Overview,MatrixNew,MatrixDetail,CaseEditor,DefectBoard,ProofList}.tsx
+        ├── pages/{Overview,MatrixNew,MatrixDetail,CaseEditor,DefectBoard,ProofList,Stocktake}.tsx
         ├── router/index.tsx
-        └── utils/{charIndex,layout,format}.ts
+        └── utils/{charIndex,layout,format,receipt,reconcile}.ts
 ```
 
 ## 数据存储说明
 
-- **业务数据**：IndexedDB（Dexie，库名 `gbmovabletype-db`，共 4 张表 `matrices` / `cases` / `defects` / `proofs`）。写入前统一 `toPlain()` 深拷贝，避免响应式对象写库抛 `DataCloneError`。
+- **业务数据**：IndexedDB（Dexie，库名 `gbmovabletype-db`，共 5 张表 `matrices` / `cases` / `defects` / `proofs` / `reconBatches`）。写入前统一 `toPlain()` 深拷贝，避免响应式对象写库抛 `DataCloneError`。
 - **草稿数据**：localStorage，前缀 `gbmovabletype-draft:`，覆盖字模登记、字盘布局、缺损登记、试印登记四处表单，刷新后可恢复。
 - **界面偏好**：localStorage，键 `gbmovabletype-ui`（Zustand persist，保存筛选条件与当前选中字盘）。
 - 容器完全无状态：不挂载命名卷、不连接数据库服务，删除重建容器不影响浏览器里的档案。

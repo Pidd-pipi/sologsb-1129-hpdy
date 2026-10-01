@@ -5,6 +5,7 @@ import type { DefectSeverity, DefectType } from '../types/defect';
 import type { MatrixAvailability, MatrixFont, MatrixMaterial, TypeMatrix } from '../types/matrix';
 import { ptOfSize } from '../types/matrix';
 import type { ProofRecord } from '../types/proof';
+import type { ReconBatch } from '../types/reconcile';
 import { matrixIdsOf } from '../utils/layout';
 import { suggestCaseCode, suggestMatrixCode, toPlain } from '../utils/format';
 
@@ -15,12 +16,14 @@ export const DB_NAME = 'gbmovabletype-db';
  * v1 建 matrices
  * v2 加 cases 表与 matrixId 索引
  * v3 加 defects / proofs 表，并为停用字模回填缺损原因
+ * v4 加 reconBatches 表（车间回执盘点对账批次）
  */
 class MovableTypeDb extends Dexie {
   matrices!: Table<TypeMatrix, string>;
   cases!: Table<TypeCase, string>;
   defects!: Table<DefectLog, string>;
   proofs!: Table<ProofRecord, string>;
+  reconBatches!: Table<ReconBatch, string>;
 
   constructor() {
     super(DB_NAME);
@@ -78,6 +81,13 @@ class MovableTypeDb extends Dexie {
           });
         }
       });
+    this.version(4).stores({
+      matrices: 'id, code, character, font, sizeName, material, availability',
+      cases: 'id, code, kind, workStation, *matrixId',
+      defects: 'id, matrixId, defectType, severity, availability, foundDate',
+      proofs: 'id, matrixId, sampleNo, clarity, proofDate',
+      reconBatches: 'id, status, contentHash, updatedAt',
+    });
   }
 }
 

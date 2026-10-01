@@ -8,6 +8,7 @@ const NAV = [
   { to: '/', label: '字模总览', testId: 'nav-overview', end: true },
   { to: '/matrices/new', label: '字模登记', testId: 'nav-matrix-new', end: false },
   { to: '/cases', label: '字盘布局', testId: 'nav-cases', end: false },
+  { to: '/stocktake', label: '盘点对账', testId: 'nav-stocktake', end: false },
   { to: '/defects', label: '缺损登记', testId: 'nav-defects', end: false },
   { to: '/proofs', label: '试印记录', testId: 'nav-proofs', end: false },
 ];
